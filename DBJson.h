@@ -54,7 +54,7 @@ namespace TheWorld_MapManager
 
 	private:
 		static std::string g_DBDir;
-		static std::string g_confFilePath;
+		static std::string g_mapConfFilePath;
 		static std::time_t s_deleteUnusedFilesLastTime;
 	};
 }

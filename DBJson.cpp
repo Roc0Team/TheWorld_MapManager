@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 namespace TheWorld_MapManager
 {
 	std::string DBJson::g_DBDir;
-	std::string DBJson::g_confFilePath;
+	std::string DBJson::g_mapConfFilePath;
 	std::time_t DBJson::s_deleteUnusedFilesLastTime = 0;
 
 	DBJson::DBJson(DBType _dbt, const char* _dataPath, bool consoleDebugMode) : DBInterface(_dbt, _dataPath, consoleDebugMode)
@@ -22,7 +22,7 @@ namespace TheWorld_MapManager
 		std::recursive_mutex& exclusiveDBAccessMutex = DBInterface::getExclusiveDBAccessMutex();
 		std::lock_guard<std::recursive_mutex> lock(exclusiveDBAccessMutex);
 
-		if (g_confFilePath.length() == 0)
+		if (g_mapConfFilePath.length() == 0)
 		{
 			std::string confFilePath = dataPath() + "\\Conf\\DBJson.json";
 			std::ifstream jsonFile(confFilePath);
@@ -31,7 +31,35 @@ namespace TheWorld_MapManager
 			Json::Value root;
 			jsonFile >> root;
 			g_DBDir = dataPath() + "\\" + root["DBDir"].asString();
-			g_confFilePath = g_DBDir + "\\" + root["DBConfFileName"].asString();
+			std::string mapName = root["MapName"].asString();
+			g_mapConfFilePath = g_DBDir + "\\" + mapName + ".json";
+
+			// Check Map Config File
+			{
+				if (not fs::exists(g_DBDir))
+					fs::create_directories(g_DBDir);
+
+				if (not fs::exists(g_DBDir + "\\" + "maps"))
+					fs::create_directories(g_DBDir + "\\" + "maps");
+
+				std::ifstream jsonMapConfigFile(g_mapConfFilePath);
+				if (jsonMapConfigFile.fail() || !jsonMapConfigFile.is_open())
+				{
+					// Writing default Map Config File
+					Json::Value root;
+					root["MapName"] = mapName;
+					root["GrowingBlockVertexNumberShift"] = "8";
+					root["GridStepInWU"] = "2.0";
+					root["HeightsFormatInQuadrantBuffer"] = "UInt16";
+
+					std::ofstream jsonMapConfigFile(g_mapConfFilePath, ios_base::out);
+					if (jsonMapConfigFile.fail() || !jsonMapConfigFile.is_open())
+						throw(MapManagerExceptionDBException(__FUNCTION__, "Could not open json map config file for writing", g_mapConfFilePath.c_str()));
+					jsonMapConfigFile << root;
+					jsonMapConfigFile.close();
+				}
+
+			}
 		}
 	}
 
@@ -45,9 +73,9 @@ namespace TheWorld_MapManager
 		std::lock_guard<std::recursive_mutex> lock(exclusiveDBAccessMutex);
 
 		Json::Value root;
-		std::ifstream jsonFile(g_confFilePath);
+		std::ifstream jsonFile(g_mapConfFilePath);
 		if (jsonFile.fail() || !jsonFile.is_open())
-			throw(MapManagerExceptionDBException(__FUNCTION__, "Could not open json DB conf file for reading", g_confFilePath.c_str()));
+			throw(MapManagerExceptionDBException(__FUNCTION__, "Could not open json DB conf file for reading", g_mapConfFilePath.c_str()));
 		jsonFile >> root;
 		return root[paranName].asString();
 	}
